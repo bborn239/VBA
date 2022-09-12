@@ -1,0 +1,103 @@
+Sub ScannedBins_Save_EMAIL_FILE()
+'Working in Excel 2000-2016
+'Mail a copy of the ActiveWorkbook with another file name
+'For Tips see: http://www.rondebruin.nl/win/winmail/Outlook/tips.htm
+    Dim wb1 As Workbook
+    Dim TempFilePath As String
+    Dim TempFileName As String
+    Dim FileExtStr As String
+    Dim strFolder As String: strFolder = " Z:\Scanned Data\"
+    Dim OutApp As Object
+    Dim OutMail As Object
+    Dim strBody As String, strSig As String
+    Dim SvName As String
+    Dim fname
+    Dim currentdate As String
+    currentdate = Format(Now(), "yyyy-MM-dd hhmmss")
+ 
+ Set objOutApp = CreateObject("Outlook.Application")
+ Set objOutMail = objOutApp.CreateItem(0)
+
+    With Application
+        .ScreenUpdating = False
+        .EnableEvents = False
+    End With
+
+    Set wb1 = ActiveWorkbook
+
+    'Make a copy of the file/Open it/Mail it/Delete it
+    'If you want to change the file name then change only TempFileName
+    SvName = "CPS Raw Scanned Data " & "(" & Sheets("Scan Sheet").Range("c2") & ")- " & currentdate
+'Application.Dialogs(xlDialogSaveAs).Show SvName
+    fname = Application.GetSaveAsFilename(strFolder & _
+    SvName, FileFilter:="Macro Enabled Workbook (*.XLSM), *.XLSX")
+ 
+ If fname = False Then Exit Sub
+ActiveWorkbook.SaveAs Filename:=fname
+    
+    ChDir ("C:\")
+    TempFilePath = Environ$("temp") & "\"
+    TempFileName = SvName & ".xlsm"
+
+
+    wb1.SaveCopyAs TempFilePath & TempFileName
+    Set OutApp = CreateObject("Outlook.Application")
+    Set OutMail = OutApp.CreateItem(0)
+
+On Error Resume Next
+ With OutMail
+ 
+ 'SET THE EMAIL CONDITIONS
+ .To = "CPSFL@EMAIL.COM"
+ .CC = ""
+ .BCC = ""
+ .Subject = "CPS Raw Scanned Data " & "(" & Sheets("Scan Sheet").Range("c2") & ")- " & currentdate
+ .Attachments.Add TempFilePath & TempFileName & FileExtStr
+
+ 'DO NOT REMOVE - THIS MUST BE VISIBLE FIRST TO GET THE DEFAULT SIGNATURE
+ .Display
+ 
+ 'GET THE HTML CODE FROM THE SIGNATURE
+ strSig = .HTMLBody
+ 'WHAT SHOULD THE EMAIL SAY, ON TOP OF THE SIGNATURE
+ 'HTML TAGS CAN BE INCLUDED HERE
+ strBody = "<font face=Calibri size=4>Please see the attached raw scanned bin data. Please review duplicates and bins on open orders.</calibri> <p>" & _
+ "Let me know if you have any questions.<p>" & _
+ "</font>"
+ 'COMBINE THE EMAIL WITH THE SIGNATURE
+ .HTMLBody = strBody & strSig
+
+ 'IF YOU DO NOT HAVE HTML IN THE BODY, USE THIS INSTEAD
+ '.Body = strBody & strSig
+ 'AUTOMATICALLY SEND EMAIL (IT WILL STILL BRIEFLY POPUP)
+ .Display
+    End With
+    On Error GoTo 0
+    'Delete the file
+    'Kill TempFilePath & TempFileName & FileExtStr
+    Set OutMail = Nothing
+    Set OutApp = Nothing
+    With Application
+        .ScreenUpdating = True
+        .EnableEvents = True
+    End With
+      ActiveWorkbook.Worksheets("Scan Sheet").AutoFilter.Sort.SortFields.Clear
+    ActiveWorkbook.Worksheets("Scan Sheet").AutoFilter.Sort.SortFields.Add Key:= _
+        Range("$D$3:$D$5000"), SortOn:=xlSortOnValues, Order:=xlDescending, _
+        DataOption:=xlSortTextAsNumbers
+    With ActiveWorkbook.Worksheets("Scan Sheet").AutoFilter.Sort
+        .Header = xlYes
+        .MatchCase = False
+        .Orientation = xlTopToBottom
+        .SortMethod = xlPinYin
+        .Apply
+    End With
+    Range("$C$3").Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Range(Selection, Selection.End(xlDown)).Select
+    ActiveSheet.Range("$c$3:$c$5000").RemoveDuplicates Columns:=1, Header:= _
+        xlYes
+    ActiveSheet.Range("$d$3:$d$5000").AutoFilter Field:=2, Criteria1:= _
+        "=Not on Open Order", Operator:=xlOr, Criteria2:="="
+    
+End Sub
